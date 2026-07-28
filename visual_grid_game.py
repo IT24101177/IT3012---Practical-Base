@@ -35,6 +35,15 @@ class VisualGridHuntGame:
             if tuple(op_pos) != (0, 0) and tuple(op_pos) not in self.walls and tuple(op_pos) not in self.food_positions:
                 self.opponents.append(op_pos)
 
+        self.toxic_traps = set()
+        while len(self.toxic_traps) < num_opponents:
+             tx = random.randint(0, self.width - 1)
+             ty = random.randint(0, self.height - 1)
+             traps_pos = [tx, ty]
+             if tuple(traps_pos) != (0, 0) and tuple(traps_pos) not in self.walls and tuple(traps_pos) not in self.food_positions:
+                self.opponents.append(traps_pos)
+            
+
         self.score = 0
         self.steps = 0
         self.collision = False
@@ -47,7 +56,8 @@ class VisualGridHuntGame:
             'hit_wall': tuple(self.agent_pos) in self.walls,
             'collision': self.collision,
             'score': self.score,
-            'remaining_food': len(self.food_positions)
+            'remaining_food': len(self.food_positions),
+            'smells_toxin':tuple(self.agent_pos) in self.toxic_traps
         }
 
     def execute_action(self, action: str):
@@ -72,6 +82,13 @@ class VisualGridHuntGame:
         if tuple_pos in self.food_positions:
             self.food_positions.remove(tuple_pos)
             self.score += 20
+
+        tuple_pos = tuple(self.agent_pos)
+        if tuple_pos in self.toxic_traps:
+         self.toxic_traps in (tuple_pos)
+         self.score -= 15
+        
+        
 
         for op in self.opponents:
             move = random.choice(['Up', 'Down', 'Left', 'Right', 'Stay'])
@@ -152,6 +169,10 @@ class GridGameGUI:
             y1 = (self.env.height - 1 - oy) * self.cell_size + offset
             self.canvas.create_rectangle(x1, y1, x1 + self.cell_size * 0.6, y1 + self.cell_size * 0.6, fill="#990000",
                                          outline="#7a0000")
+
+        for tx,ty in range(self.env.toxic_traps):
+                
+        
 
         ax, ay = self.env.agent_pos
         offset = self.cell_size * 0.15
