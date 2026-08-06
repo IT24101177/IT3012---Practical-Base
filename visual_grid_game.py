@@ -1,6 +1,9 @@
 # visual_grid_game.py
 import random
 import tkinter as tk
+from agent import SimpleReflexAgent
+from agent import ModelBasedAgent
+
 
 
 class VisualGridHuntGame:
@@ -47,21 +50,31 @@ class VisualGridHuntGame:
         self.score = 0
         self.steps = 0
         self.collision = False
+        self.facing = 'Right'
 
     def get_percept(self) -> dict:
+        x, y = self.agent_pos
+        if self.facing == 'Up':
+            ahead = (x, y + 1)
+        elif self.facing == 'Down':
+            ahead = (x, y - 1)
+        elif self.facing == 'Left':
+            ahead = (x - 1, y)
+        else:
+            ahead = (x + 1, y)
+
+        out_of_bounds = not (0 <= ahead[0] < self.width and 0 <= ahead[1] < self.height)
+        wall_ahead = out_of_bounds or ahead in self.walls
+
         return {
-            'agent_pos': list(self.agent_pos),
-            'opponent_positions': [list(op) for op in self.opponents],
-            'smells_food': tuple(self.agent_pos) in self.food_positions,
-            'hit_wall': tuple(self.agent_pos) in self.walls,
-            'collision': self.collision,
-            'score': self.score,
-            'remaining_food': len(self.food_positions),
-            'smells_toxin':tuple(self.agent_pos) in self.toxic_traps
+            'wall_ahead': wall_ahead,
+            'food_here': tuple(self.agent_pos) in self.food_positions
+            
         }
 
     def execute_action(self, action: str):
         self.steps += 1
+        self.facing = action
         new_pos = list(self.agent_pos)
 
         if action == 'Up':
@@ -118,6 +131,9 @@ class GridGameGUI:
 
         self.env = VisualGridHuntGame(width=width, height=height, num_food=num_food, num_opponents=num_opponents,
                                       custom_walls=walls)
+        """self.my_agent = SimpleReflexAgent()"""
+        self.my_agent = ModelBasedAgent()
+
 
         # Dynamically calculate cell size so the total canvas fits nicely within a 600x600 window ceiling
         max_canvas_dim = 600
@@ -170,8 +186,14 @@ class GridGameGUI:
             self.canvas.create_rectangle(x1, y1, x1 + self.cell_size * 0.6, y1 + self.cell_size * 0.6, fill="#990000",
                                          outline="#7a0000")
 
-        for tx,ty in range(self.env.toxic_traps):
-                
+        for tx, ty in self.env.toxic_traps:
+            offset = self.cell_size * 0.2
+            x1 = tx * self.cell_size + offset
+            y1 = (self.env.height - 1 - ty) * self.cell_size + offset
+            self.canvas.create_rectangle(x1, y1, x1 + self.cell_size * 0.6, y1 + self.cell_size * 0.6,
+                                         fill="#7c3aed", outline="#5b21b6")
+
+        ax, ay = self.env.agent_pos
         
 
         ax, ay = self.env.agent_pos
@@ -185,17 +207,18 @@ class GridGameGUI:
         self.btn.config(state="disabled")
 
         def step():
-            if not self.env.is_done():
-                action = random.choice(['Up', 'Down', 'Left', 'Right'])
-                self.env.execute_action(action)
+                if not self.env.is_done():
+                  percept = self.env.get_percept()
+                  action = self.my_agent.sense_and_act(percept)
+                  self.env.execute_action(action)
 
-                self.draw_grid()
-                self.label.config(text=f"Score: {self.env.score} | Steps: {self.env.steps} | Action: {action}")
-                self.root.after(250, step)
-            else:
-                end_text = f"Collision! Game Over! Final Score: {self.env.score}" if self.env.collision else f"Finished! Final Score: {self.env.score}"
-                self.label.config(text=end_text)
-                self.btn.config(state="normal")
+                  self.draw_grid()
+                  self.label.config(text=f"Score: {self.env.score} | Steps: {self.env.steps} | Action: {action}")
+                  self.root.after(250, step)
+                else:
+                  end_text = f"Collision! Game Over! Final Score: {self.env.score}" if self.env.collision else f"Finished! Final Score: {self.env.score}"
+                  self.label.config(text=end_text)
+                  self.btn.config(state="normal")
 
         step()
 
